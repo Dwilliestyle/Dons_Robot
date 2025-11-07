@@ -1,0 +1,10 @@
+usb_cam:
+  ros__parameters:
+    video_device: "/dev/video0"
+    pixel_format: "mjpeg2rgb"
+    image_width: 640
+    image_height: 480
+    framerate: 30.0
+    camera_name: "rasprover_camera"
+    camera_info_url: ""
+    io_method: "mmap"

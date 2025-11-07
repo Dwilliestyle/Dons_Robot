@@ -1,0 +1,236 @@
+<?xml version="1.0"?>
+
+<robot name="dons_robot">
+  
+  <!-- Base link (main robot chassis) -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://dons_robot/meshes/base_link.stl"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <material name="silver">
+        <color rgba="0.7 0.7 0.7 1.0"/>  <!-- Aluminum body -->
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <!-- Use simplified geometry for collision detection -->
+        <box size="0.183 0.172 0.132"/>
+      </geometry>
+      <origin xyz="0 0 0.066" rpy="0 0 0"/>
+    </collision>
+    <!-- Inertial properties (estimated for aluminum chassis) -->
+    <inertial>
+      <origin xyz="0 0 0.066" rpy="0 0 0"/>
+      <mass value="2.0"/>  <!-- Estimated robot mass in kg -->
+      <inertia ixx="0.05" ixy="0" ixz="0" iyy="0.06" iyz="0" izz="0.08"/>
+    </inertial>
+  </link>
+
+  <!-- Base footprint (for navigation - at ground level) -->
+  <link name="base_footprint"/>
+  
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <!-- Ground clearance: 32.57mm from floor to bottom of base -->
+    <origin xyz="0 0 0.033" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Camera link (fixed mount directly on chassis) -->
+  <link name="camera_link">
+    <visual>
+      <geometry>
+        <!-- Simple camera representation - no mesh file for fixed camera -->
+        <cylinder radius="0.015" length="0.020"/>
+      </geometry>
+      <material name="black">
+        <color rgba="0.1 0.1 0.1 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.015" length="0.020"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <!-- Camera position: fixed mount on front of robot body -->
+    <origin xyz="0.065 0.0 0.086" rpy="0 1.55 0"/>
+  </joint>
+
+  <!-- Camera optical frame (for image processing) -->
+  <link name="camera_optical_link"/>
+  
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_optical_link"/>
+    <!-- Standard camera optical frame transform -->
+    <origin xyz="0 0 0" rpy="-1.57 0 -1.57"/>
+  </joint>
+
+  <!-- LIDAR link (mounted above camera) -->
+  <link name="laser_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://dons_robot/meshes/base_lidar_link.stl"/>
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.035" length="0.035"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser_link"/>
+    <!-- LIDAR position: perfect positioning found by testing! -->
+    <origin xyz="0.020 0.0 0.100" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Front Left Wheel -->
+  <link name="front_left_wheel">
+    <visual>
+      <geometry>
+        <mesh filename="package://dons_robot/meshes/left_up_wheel_link.stl"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <material name="wheel_black">
+        <color rgba="0.2 0.2 0.2 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <!-- Cylinder collision for wheels works better than mesh -->
+        <cylinder radius="0.040" length="0.025"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <joint name="front_left_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="front_left_wheel"/>
+    <!-- Front left wheel position - adjusted height and position -->
+    <origin xyz="0.050 0.035 0.000" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>  <!-- Wheel rotates around Y-axis -->
+  </joint>
+
+  <!-- Front Right Wheel -->
+  <link name="front_right_wheel">
+    <visual>
+      <geometry>
+        <mesh filename="package://dons_robot/meshes/right_up_wheel_link.stl"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <material name="wheel_black">
+        <color rgba="0.2 0.2 0.2 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.040" length="0.025"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <joint name="front_right_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="front_right_wheel"/>
+    <origin xyz="0.050 -0.035 -0.0" rpy="0 0 0"/>  <!-- Moved down and forward -->
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <!-- Rear Left Wheel -->
+  <link name="rear_left_wheel">
+    <visual>
+      <geometry>
+        <mesh filename="package://dons_robot/meshes/left_down_wheel_link.stl"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <material name="wheel_black">
+        <color rgba="0.2 0.2 0.2 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.040" length="0.025"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <joint name="rear_left_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="rear_left_wheel"/>
+    <origin xyz="-0.050 0.035 -0.0" rpy="0 0 0"/>  <!-- Moved down and back -->
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <!-- Rear Right Wheel -->
+  <link name="rear_right_wheel">
+    <visual>
+      <geometry>
+        <mesh filename="package://dons_robot/meshes/right_down_wheel_link.stl"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <material name="wheel_black">
+        <color rgba="0.2 0.2 0.2 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.040" length="0.025"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0" rpy="1.57 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <joint name="rear_right_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="rear_right_wheel"/>
+    <origin xyz="-0.050 -0.035 -0.0" rpy="0 0 0"/>  <!-- Moved down and back -->
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <!-- IMU link (ESP32 onboard IMU) -->
+  <link name="imu_link"/>
+  
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <!-- IMU is on ESP32 board, estimated position inside chassis -->
+    <origin xyz="0.0 0.0 0.020" rpy="0 0 0"/>
+  </joint>
+
+</robot>

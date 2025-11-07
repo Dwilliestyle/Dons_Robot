@@ -1,0 +1,55 @@
+# robot_params.yaml
+# Configuration parameters for Don's RaspRover
+# Using official Waveshare protocol
+
+# ESP32 Bridge Node Parameters
+esp32_bridge:
+  ros__parameters:
+    # Serial communication
+    serial_port: "/dev/ttyAMA0"  # Pi GPIO UART to ESP32
+    baud_rate: 115200            # ESP32 communication speed
+    timeout: 0.1                 # Serial read timeout (seconds)
+    watchdog_timeout: 0.1        # Stop robot after this many seconds without commands
+
+# Joystick Teleop Parameters  
+teleop_twist_joy:
+  ros__parameters:
+    # Axis mappings (PlayStation controller)
+    axis_linear:
+      x: 1                       # Left stick full control
+    axis_angular:
+      yaw: 0                     
+    
+    # Normal speed settings
+    scale_linear:
+      x: 0.5                     # Normal max speed (m/s)
+    scale_angular:
+      yaw: 5.0                  # Normal max turn rate (rad/s)
+    
+    # Turbo mode (hold R1 button)
+    enable_turbo_button: 5       # R1 shoulder button
+    scale_linear_turbo:
+      x: 0.8                     # Turbo max speed (m/s)
+    scale_angular_turbo:
+      yaw: 6.0                # Turbo max turn rate (rad/s)
+    
+    # Safety - deadman switch
+    enable_button: 4             # L1 shoulder button (MUST hold to move)
+    require_enable_button: true  # Stop publishing when button released
+    
+    # Controller settings
+    autorepeat_rate: 20.0        # Command publishing rate (Hz)
+
+# Joy Node Parameters
+joy:
+  ros__parameters:
+    device_id: 0                 # First joystick device (/dev/input/js0)
+    deadzone: 0.05               # Prevent stick drift
+    autorepeat_rate: 20.0        # 20 Hz publishing rate
+    coalesce_interval_ms: 1      # Combine rapid inputs (milliseconds)
+
+# Robot State Publisher Parameters
+robot_state_publisher:
+  ros__parameters:
+    use_tf_static: true          # Use static transforms when possible
+    ignore_timestamp: false      # Respect message timestamps
