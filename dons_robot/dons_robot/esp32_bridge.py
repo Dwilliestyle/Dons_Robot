@@ -110,9 +110,9 @@ class ESP32Bridge(Node):
                 self.get_logger().debug(f'Battery voltage from INA219: {voltage:.2f}V')
                 
                 # LOW BATTERY WARNINGS
-                if voltage < 9.0:  # Critical level
+                if voltage < 9.5:  # Critical level
                     self.get_logger().error(f'🔴 CRITICAL BATTERY: {voltage:.2f}V - Stop and recharge immediately!')
-                elif voltage < 9.5:  # Warning level
+                elif voltage < 10.0:  # Warning level
                     self.get_logger().warn(f'⚠️  LOW BATTERY: {voltage:.2f}V - Consider recharging soon!')
                     
             else:
@@ -221,9 +221,9 @@ class ESP32Bridge(Node):
             
             if self.battery_voltage is not None:
                 # Add warning indicator to OLED display
-                if self.battery_voltage < 9.0:
+                if self.battery_voltage < 9.5:
                     self.update_oled_line(3, f"BATT!: {self.battery_voltage:.2f}V!")
-                elif self.battery_voltage < 9.5:
+                elif self.battery_voltage < 10.0:
                     self.update_oled_line(3, f"Batt!: {self.battery_voltage:.2f}V")
                 else:
                     self.update_oled_line(3, f"Battery: {self.battery_voltage:.2f}V")
