@@ -2,15 +2,19 @@
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, TransformStamped
+from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float32
+from tf2_ros import TransformBroadcaster
 import serial
 import json
 import threading
 import time
 from datetime import datetime
 import socket
+import math
+import subprocess
 
 try:
     import smbus
@@ -55,6 +59,18 @@ class ESP32Bridge(Node):
         # Battery data
         self.battery_voltage = None
         self.battery_current = None
+        
+        # Battery warning flags
+        self.low_battery_warned = False
+        self.critical_battery_warned = False
+
+        # Odometry variables
+        self.x = 0.0
+        self.y = 0.0
+        self.theta = 0.0
+        self.last_odom_time = self.get_clock().now()
+        self.current_linear = 0.0
+        self.current_angular = 0.0
 
         # Initialize I2C for INA219 battery monitoring
         self.i2c_bus = None
@@ -71,6 +87,8 @@ class ESP32Bridge(Node):
         self.cmd_vel_sub = self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
         self.joint_state_pub = self.create_publisher(JointState, 'joint_states', 10)
         self.voltage_pub = self.create_publisher(Float32, 'battery_voltage', 10)
+        self.odom_pub = self.create_publisher(Odometry, 'odom', 10)
+        self.tf_broadcaster = TransformBroadcaster(self)
 
         # Start serial read thread
         if self.serial_conn:
@@ -80,11 +98,82 @@ class ESP32Bridge(Node):
         # Timers
         self.oled_timer = self.create_timer(1.0, self.update_oled_display)
         self.status_timer = self.create_timer(0.1, self.check_status)
-        
-        # Battery reading timer (every 5 seconds)
         self.battery_timer = self.create_timer(5.0, self.read_battery_direct)
+        self.odom_timer = self.create_timer(0.05, self.update_odometry)  # 20 Hz
 
-        self.get_logger().info('ESP32 Bridge node started with OLED + battery monitoring')
+        self.get_logger().info('ESP32 Bridge node started with OLED + battery monitoring + odometry + audio warnings')
+
+    def play_audio_warning(self, message):
+        """Play an audible warning using espeak"""
+        try:
+            subprocess.Popen(['espeak', message], 
+                           stdout=subprocess.DEVNULL, 
+                           stderr=subprocess.DEVNULL)
+        except Exception as e:
+            self.get_logger().debug(f'Could not play audio warning: {e}')
+
+    def update_odometry(self):
+        """Update robot odometry based on commanded velocities (dead reckoning)"""
+        current_time = self.get_clock().now()
+        dt = (current_time - self.last_odom_time).nanoseconds / 1e9
+        
+        if dt <= 0.0:
+            return
+            
+        # Dead reckoning: integrate velocity commands
+        delta_x = self.current_linear * math.cos(self.theta) * dt
+        delta_y = self.current_linear * math.sin(self.theta) * dt
+        delta_theta = self.current_angular * dt
+        
+        self.x += delta_x
+        self.y += delta_y
+        self.theta += delta_theta
+        
+        # Normalize theta to [-pi, pi]
+        self.theta = math.atan2(math.sin(self.theta), math.cos(self.theta))
+        
+        # Create quaternion from yaw
+        qz = math.sin(self.theta / 2.0)
+        qw = math.cos(self.theta / 2.0)
+        
+        # Publish TF transform: odom -> base_footprint
+        t = TransformStamped()
+        t.header.stamp = current_time.to_msg()
+        t.header.frame_id = 'odom'
+        t.child_frame_id = 'base_footprint'
+        
+        t.transform.translation.x = self.x
+        t.transform.translation.y = self.y
+        t.transform.translation.z = 0.0
+        
+        t.transform.rotation.x = 0.0
+        t.transform.rotation.y = 0.0
+        t.transform.rotation.z = qz
+        t.transform.rotation.w = qw
+        
+        self.tf_broadcaster.sendTransform(t)
+        
+        # Publish odometry message
+        odom = Odometry()
+        odom.header.stamp = current_time.to_msg()
+        odom.header.frame_id = 'odom'
+        odom.child_frame_id = 'base_footprint'
+        
+        odom.pose.pose.position.x = self.x
+        odom.pose.pose.position.y = self.y
+        odom.pose.pose.position.z = 0.0
+        odom.pose.pose.orientation.x = 0.0
+        odom.pose.pose.orientation.y = 0.0
+        odom.pose.pose.orientation.z = qz
+        odom.pose.pose.orientation.w = qw
+        
+        odom.twist.twist.linear.x = self.current_linear
+        odom.twist.twist.linear.y = 0.0
+        odom.twist.twist.angular.z = self.current_angular
+        
+        self.odom_pub.publish(odom)
+        
+        self.last_odom_time = current_time
 
     def read_battery_direct(self):
         """Read battery voltage directly from INA219 sensor"""
@@ -109,11 +198,21 @@ class ESP32Bridge(Node):
                 self.voltage_pub.publish(voltage_msg)
                 self.get_logger().debug(f'Battery voltage from INA219: {voltage:.2f}V')
                 
-                # LOW BATTERY WARNINGS
+                # LOW BATTERY WARNINGS WITH AUDIO (only once per threshold)
                 if voltage < 9.5:  # Critical level
                     self.get_logger().error(f'🔴 CRITICAL BATTERY: {voltage:.2f}V - Stop and recharge immediately!')
+                    if not self.critical_battery_warned:
+                        self.play_audio_warning('Critical battery. Stop and recharge immediately')
+                        self.critical_battery_warned = True
                 elif voltage < 10.0:  # Warning level
                     self.get_logger().warn(f'⚠️  LOW BATTERY: {voltage:.2f}V - Consider recharging soon!')
+                    if not self.low_battery_warned:
+                        self.play_audio_warning('Low battery warning')
+                        self.low_battery_warned = True
+                else:
+                    # Reset flags when battery is good
+                    self.low_battery_warned = False
+                    self.critical_battery_warned = False
                     
             else:
                 self.get_logger().debug(f'Voltage reading out of range: {voltage}V')
@@ -141,6 +240,8 @@ class ESP32Bridge(Node):
         if time.time() - self.last_cmd_time > self.cmd_timeout:
             if self.robot_status != "Stopped":
                 self.robot_status = "Stopped"
+                self.current_linear = 0.0
+                self.current_angular = 0.0
 
     def cmd_vel_callback(self, msg):
         linear = msg.linear.x
@@ -156,6 +257,10 @@ class ESP32Bridge(Node):
 
         if abs(angular) < 0.05:
             angular = 0.0
+
+        # Store velocities for odometry
+        self.current_linear = linear
+        self.current_angular = angular
 
         command = {
             'T': '13',
