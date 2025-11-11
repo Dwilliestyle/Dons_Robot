@@ -248,6 +248,16 @@ class ESP32Bridge(Node):
         angular = msg.angular.z
 
         self.last_cmd_time = time.time()
+        
+        # Intelligent angular velocity boost for stationary turning
+        # Only boost when turning in place (low linear speed)
+        if abs(linear) < 0.15 and abs(angular) > 0.1:
+            # Turning in place - boost angular to overcome static friction
+            boost_factor = 2.0  # Adjust this value as needed
+            angular = angular * boost_factor
+            self.get_logger().debug(f'Boosting stationary turn: angular = {angular:.2f}')
+        
+        # Update robot status
         if abs(linear) < 0.01 and abs(angular) < 0.01:
             self.robot_status = "Stopped"
         elif abs(angular) > 0.1:
